@@ -58,7 +58,9 @@ PLATFORM_CONFIGS = {
             #是否支持地点
             "location": False,
             #是否支持定时发布
-            "schedule": False
+            "schedule": False,
+            #标签选择键位
+            "tagkey": "Enter"
         }
     },
     "tencent": {
@@ -142,7 +144,9 @@ PLATFORM_CONFIGS = {
             #是否支持地点
             "location": False,
             #是否支持定时发布
-            "schedule": False
+            "schedule": False,
+            #标签选择键位
+            "tagkey": "Enter"
         }
     },
     "kuaishou": {
@@ -188,7 +192,9 @@ PLATFORM_CONFIGS = {
             #是否支持地点
             "location": False,
             #是否支持定时发布
-            "schedule": False
+            "schedule": False,
+            #标签选择键位
+            "tagkey": " "
         }
     },
     "tiktok": {

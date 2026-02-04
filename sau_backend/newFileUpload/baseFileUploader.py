@@ -93,6 +93,8 @@ class BaseFileUploader(object):
         self.textbox_supported = self.config["features"]["textbox"]
         # 是否支持标签
         self.tags_supported = self.config["features"]["tags"]
+        # 标签选择键位
+        self.tagkey = self.config["features"]["tagkey"]
         # 是否支持封面
         self.thumbnail_supported = self.config["features"]["thumbnail"]
         # 是否支持地点
@@ -492,10 +494,14 @@ class BaseFileUploader(object):
                     
                 for index, tag in enumerate(self.tags, start=1):
                     self.logger.info("Setting the %s tag" % index)
-                    await page.keyboard.insert_text(f"#{tag} ")
-                    # 等待300毫秒
+                    await page.keyboard.insert_text(f"#{tag}")
+                    # 等待1秒让标签选择器加载
+                    await page.wait_for_timeout(1000)
+                    await page.keyboard.press(f"{self.tagkey}")
+                    # 每次选择后稍微等待
                     await page.wait_for_timeout(self.wait_timeout_500ms)
-            return True
+            return False
+
         except Exception as e:
             self.logger.error(f"Failed to add title, text and tags: {str(e)}")
             return False
