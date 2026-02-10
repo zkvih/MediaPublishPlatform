@@ -49,9 +49,9 @@ RUN playwright install chromium-headless-shell
 
 COPY . .
 
-COPY --from=builder /app/dist/index.html /app
-COPY --from=builder /app/dist/assets /app/assets
-COPY --from=builder /app/dist/vite.svg /app/assets
+COPY --from=builder /app/dist/index.html /app/sau_backend/
+COPY --from=builder /app/dist/assets /app/sau_backend/assets
+COPY --from=builder /app/dist/vite.svg /app/sau_backend/assets
 
 RUN cp sau_backend/conf.example.py sau_backend/conf.py
 
