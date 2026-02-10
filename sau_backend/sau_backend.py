@@ -874,9 +874,12 @@ async def get_platform_homepage():
         p = await async_playwright().start()
 
         # 启动浏览器
-        browser = await p.chromium.launch(
-            headless=False, executable_path=LOCAL_CHROME_PATH
-        )
+        if LOCAL_CHROME_PATH:
+            browser = await p.chromium.launch(
+                headless=False, executable_path=LOCAL_CHROME_PATH
+            )
+        else:
+            browser = await p.chromium.launch(headless=False)
 
         # 创建上下文并加载cookie
         context = await browser.new_context(storage_state=str(cookie_file_path))
