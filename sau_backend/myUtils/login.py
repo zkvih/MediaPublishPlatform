@@ -1,11 +1,29 @@
 import asyncio
 import sqlite3
 import time
+import os
+import base64
 from playwright.async_api import async_playwright
 from utils.base_social_media import set_init_script
 from pathlib import Path
 from conf import BASE_DIR, LOCAL_CHROME_PATH
 from newFileUpload.platform_configs import get_platform_key_by_type, PLATFORM_CONFIGS
+
+
+# 检测是否在 Docker 环境中运行
+def is_running_in_docker():
+    """检测是否在 Docker 容器中运行"""
+    # 方法1: 检查 /.dockerenv 文件
+    if os.path.exists("/.dockerenv"):
+        return True
+    # 方法2: 检查 cgroup
+    try:
+        with open("/proc/1/cgroup", "r") as f:
+            return "docker" in f.read()
+    except:
+        pass
+    # 方法3: 检查环境变量
+    return os.getenv("DOCKER_CONTAINER", "").lower() == "true"
 
 
 # 统一登录异步处理函数
@@ -58,6 +76,11 @@ async def unified_login_cookie_gen(type, id, status_queue):
         # 创建cookiesFile目录（如果不存在）
         cookie_file_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # 检测是否在 Docker 环境
+        in_docker = is_running_in_docker()
+        if in_docker:
+            print("🐳 检测到 Docker 环境，将使用无头模式运行浏览器")
+
         # 使用Playwright进行登录
         async with async_playwright() as playwright:
             options = {
@@ -67,10 +90,9 @@ async def unified_login_cookie_gen(type, id, status_queue):
                     "--disable-dev-shm-usage",
                     "--disable-gpu",
                     "--ignore-certificate-errors",
-                    "--start-maximized",
                     "--disable-blink-features=AutomationControlled",
                 ],
-                "headless": False,  # 登录时需要可视化
+                "headless": in_docker,  # Docker中使用无头模式，本地使用有界面模式
             }
             if LOCAL_CHROME_PATH:
                 options["executable_path"] = LOCAL_CHROME_PATH
@@ -115,16 +137,56 @@ async def unified_login_cookie_gen(type, id, status_queue):
                         if qr_element:
                             # 再次等待一下确保图片加载完成
                             await asyncio.sleep(1)
-                            qr_src = await qr_element.get_attribute("src")
-                            if qr_src:
-                                print(f"✅ 成功获取二维码 (长度: {len(qr_src)})")
-                                # 发送二维码给前端，使用 code 201 表示二维码数据
-                                # 注意：JSON 字符串中的双引号需要转义
-                                status_queue.put(
-                                    f'{{"code": 201, "msg": "二维码获取成功", "data": "{qr_src}"}}'
-                                )
+
+                            if in_docker:
+                                # Docker环境：截图二维码元素并返回 base64
+                                try:
+                                    qr_screenshot = await qr_element.screenshot(
+                                        type="png"
+                                    )
+                                    qr_base64 = base64.b64encode(qr_screenshot).decode(
+                                        "utf-8"
+                                    )
+                                    qr_data_url = f"data:image/png;base64,{qr_base64}"
+                                    print(
+                                        f"✅ 成功截图二维码 (base64长度: {len(qr_data_url)})"
+                                    )
+                                    status_queue.put(
+                                        f'{{"code": 201, "msg": "二维码获取成功", "data": "{qr_data_url}"}}'
+                                    )
+                                except Exception as e:
+                                    print(f"❌ 截图二维码失败: {str(e)}")
+                                    # 尝试截图整个页面
+                                    try:
+                                        page_screenshot = await page.screenshot(
+                                            type="png", full_page=False
+                                        )
+                                        page_base64 = base64.b64encode(
+                                            page_screenshot
+                                        ).decode("utf-8")
+                                        page_data_url = (
+                                            f"data:image/png;base64,{page_base64}"
+                                        )
+                                        print(
+                                            f"✅ 成功截图页面 (base64长度: {len(page_data_url)})"
+                                        )
+                                        status_queue.put(
+                                            f'{{"code": 201, "msg": "页面截图获取成功", "data": "{page_data_url}"}}'
+                                        )
+                                    except Exception as e2:
+                                        print(f"❌ 截图页面也失败: {str(e2)}")
                             else:
-                                print("❌ 二维码元素没有src属性")
+                                # 本地环境：获取二维码 src 属性
+                                qr_src = await qr_element.get_attribute("src")
+                                if qr_src:
+                                    print(f"✅ 成功获取二维码 (长度: {len(qr_src)})")
+                                    # 发送二维码给前端，使用 code 201 表示二维码数据
+                                    # 注意：JSON 字符串中的双引号需要转义
+                                    status_queue.put(
+                                        f'{{"code": 201, "msg": "二维码获取成功", "data": "{qr_src}"}}'
+                                    )
+                                else:
+                                    print("❌ 二维码元素没有src属性")
                     except Exception as e:
                         print(f"⚠️ 查找二维码超时: {str(e)}")
             except Exception as e:

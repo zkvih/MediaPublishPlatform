@@ -45,7 +45,8 @@ COPY requirements.txt requirements.txt
 
 RUN pip install -r requirements.txt
 
-RUN playwright install chromium-headless-shell
+# 安装完整版 Chromium（支持无头模式截图）
+RUN playwright install chromium
 
 COPY . .
 
