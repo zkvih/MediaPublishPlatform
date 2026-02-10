@@ -216,8 +216,10 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { publishApi } from '@/api/publish'
+import { getApiBaseUrl } from '@/utils/apiBase'
 
 const router = useRouter()
+const apiBaseUrl = getApiBaseUrl()
 
 // 账号统计数据
 const accountStats = reactive({
@@ -271,7 +273,7 @@ const platformMap = {
 // 获取平台统计数据
 async function fetchPlatformStats() {
   try {
-    const response = await fetch('/api/getPlatformStats')
+    const response = await fetch(`${apiBaseUrl}/getPlatformStats`)
     const data = await response.json()
     
     if (data.code === 200) {
@@ -313,7 +315,7 @@ async function fetchPlatformStats() {
 // 获取文件统计数据
 async function fetchFileStats() {
   try {
-    const response = await fetch('/api/getFileStats')
+    const response = await fetch(`${apiBaseUrl}/getFileStats`)
     const data = await response.json()
     
     if (data.code === 200) {

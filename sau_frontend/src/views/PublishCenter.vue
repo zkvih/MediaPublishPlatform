@@ -505,9 +505,10 @@ import { useAppStore } from '@/stores/app'
 import { materialApi } from '@/api/material'
 import { publishApi } from '@/api/publish'
 import { accountApi } from '@/api/account'
+import { getApiBaseUrl } from '@/utils/apiBase'
 
 // API base URL
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'
+const apiBaseUrl = getApiBaseUrl()
 
 // Authorization headers
 const authHeaders = computed(() => ({
