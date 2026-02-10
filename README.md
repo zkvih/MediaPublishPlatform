@@ -454,7 +454,7 @@ docker build -t sau .
 2. 运行 Docker 容器：
 
 ```bash
-docker run -d -p 5409:5409 -p 5173:5173 --name mpp mpp
+docker run -d -p 5409:5409 -p 5173:5173 --name sau sau
 ```
 
 3. 访问应用：

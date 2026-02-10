@@ -1196,7 +1196,7 @@ import xiaohongshuIcon from '@/assets/xiaohongshu.jpg';
 import shipinhaoIcon from '@/assets/shipinhao.jpg';
 import tiktokIcon from '@/assets/tiktok.jpg';
 import instagramIcon from '@/assets/instagram.svg';
-import insIcon from '@/assets/Ins.jpg';
+import insIcon from '@/assets/ins.jpg';
 import facebookIcon from '@/assets/facebook.jpg';
 import bilibiliIcon from '@/assets/bilibili.jpg';
 import baijiahaoIcon from '@/assets/baijiahao.jpg';
