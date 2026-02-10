@@ -445,21 +445,41 @@ sau/
 
 ### Docker 部署
 
-1. 构建 Docker 镜像：
+项目已提供基于 OpenResty 的反向代理编排文件：`docker-compose.openresty.yml`。
+
+1. 构建并启动服务（前端、后端、OpenResty）：
 
 ```bash
-docker build -t sau .
+docker compose -f docker-compose.openresty.yml up -d --build
 ```
 
-2. 运行 Docker 容器：
+2. 初始化数据库表（首次部署必做）：
 
 ```bash
-docker run -d -p 5409:5409 -p 5173:5173 --name sau sau
+docker compose -f docker-compose.openresty.yml run --rm backend python db/createTable.py
 ```
 
-3. 访问应用：
+3. 查看服务状态：
 
-打开浏览器，访问 `http://localhost:5173`
+```bash
+docker compose -f docker-compose.openresty.yml ps
+```
+
+4. 访问应用：
+
+打开浏览器，访问 `http://localhost:5409`
+
+说明：
+
+- OpenResty 对外监听 `5409`
+- 前端页面由 OpenResty 反代到 `frontend:80`
+- 后端 API（含 `/login` SSE）由 OpenResty 反代到 `backend:5409`
+
+停止服务：
+
+```bash
+docker compose -f docker-compose.openresty.yml down
+```
 
 ### 生产环境部署
 
