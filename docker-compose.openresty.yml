@@ -1,0 +1,44 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mpp-backend
+    expose:
+      - "5409"
+    restart: unless-stopped
+    volumes:
+      - ./db:/app/db
+      - ./videoFile:/app/videoFile
+      - ./cookiesFile:/app/cookiesFile
+    networks:
+      - mpp-net
+
+  frontend:
+    build:
+      context: ./sau_frontend
+      dockerfile: Dockerfile
+    container_name: mpp-frontend
+    expose:
+      - "80"
+    restart: unless-stopped
+    networks:
+      - mpp-net
+
+  openresty:
+    build:
+      context: ./docker/openresty
+      dockerfile: Dockerfile
+    container_name: mpp-openresty
+    ports:
+      - "5409:5409"
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - mpp-net
+
+networks:
+  mpp-net:
+    driver: bridge
