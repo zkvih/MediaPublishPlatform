@@ -381,7 +381,7 @@ class BaseFileUploader(object):
             
             # 上传按钮，需要点击触发系统文件选择器
             async with page.expect_file_chooser() as fc_info:
-                await upload_button.click()
+                await upload_button.click(force=True)
             file_chooser = await fc_info.value
             await file_chooser.set_files(self.file_path)
             self.logger.info(f"通过系统文件选择器上传文件: {self.file_path}")
@@ -500,7 +500,7 @@ class BaseFileUploader(object):
                     await page.keyboard.press(f"{self.tagkey}")
                     # 每次选择后稍微等待
                     await page.wait_for_timeout(self.wait_timeout_500ms)
-            return False
+            return True
 
         except Exception as e:
             self.logger.error(f"Failed to add title, text and tags: {str(e)}")

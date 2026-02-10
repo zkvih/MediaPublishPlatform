@@ -9,13 +9,15 @@ PLATFORM_CONFIGS = {
         "personal_url": "https://creator.xiaohongshu.com/new/home",
         #平台登录URL
         "login_url": "https://creator.xiaohongshu.com/login",
+        "qr_switch_selector": "div.css-jjnw1w img",
+        "qr_code_selector": "div.css-1d81qt0>img[src^='data:image']",
         #平台视频发布URL
         "creator_video_url": "https://creator.xiaohongshu.com/publish/publish?from=homepage&target=video&openFilePicker=true",
         #平台图片发布URL
         "creator_image_url": "https://creator.xiaohongshu.com/publish/publish?from=homepage&target=image&openFilePicker=true",
         "selectors": {
             #上传按钮选择器
-            "upload_button": ['input.upload-input[type="file"]'],
+            "upload_button": ['input.upload-input[type="file"] + div button:has-text("上传图片"),input.upload-input[type="file"] + div button:has-text("上传视频")'],
             #发布按钮选择器
             "publish_button": ['div.d-button-content span.d-text:has-text("发布")'],
             #标题编辑器选择器
@@ -114,6 +116,7 @@ PLATFORM_CONFIGS = {
         "platform_name": "douyin",
         "personal_url": "https://creator.douyin.com/creator-micro/home",
         "login_url": "https://creator.douyin.com/login",
+        "qr_code_selector": "img[class*='qrcode_img'], .qrcode-vz0gH7 img",
         "creator_video_url": "https://creator.douyin.com/creator-micro/content/upload",
         "creator_image_url": "https://creator.douyin.com/creator-micro/content/upload?default-tab=3",
         "selectors": {
@@ -154,6 +157,8 @@ PLATFORM_CONFIGS = {
         "platform_name": "kuaishou",
         "personal_url": "https://cp.kuaishou.com/profile",
         "login_url": "https://passport.kuaishou.com/pc/account/login",
+        "qr_switch_selector": "div.platform-switch-tips:has-text('扫码登录')",
+        "qr_code_selector": "img[alt='qrcode'], img[src^='data:image'], img[class*='qrcode'], .qrcode-img img",
         "creator_video_url": "https://cp.kuaishou.com/article/publish/video?tabType=1",
         "creator_image_url": "https://cp.kuaishou.com/article/publish/video?tabType=2",
         "selectors": {

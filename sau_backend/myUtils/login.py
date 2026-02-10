@@ -84,6 +84,40 @@ async def unified_login_cookie_gen(type, id, status_queue):
 
             # 等待用户登录完成
             print(f"请在浏览器中登录{platform_config['platform_name']}账号")
+            #点击切换二维码
+            qr_switch_selector = platform_config.get("qr_switch_selector")
+            if qr_switch_selector:
+                print(f"尝试切换二维码登录: {qr_switch_selector}")
+                await asyncio.sleep(1)
+                el = await page.query_selector(qr_switch_selector)
+                if el:
+                    await el.click()
+                    await asyncio.sleep(1)
+            # 尝试获取二维码并返回给前端
+            try:
+                qr_selector = platform_config.get("qr_code_selector")
+                if qr_selector:
+                    print(f"尝试查找二维码元素: {qr_selector}")
+                    # 给页面一点加载时间
+                    await asyncio.sleep(2)
+                    try:
+                        # 等待二维码元素出现，最多等待 15 秒
+                        qr_element = await page.wait_for_selector(qr_selector, timeout=15000)
+                        if qr_element:
+                            # 再次等待一下确保图片加载完成
+                            await asyncio.sleep(1)
+                            qr_src = await qr_element.get_attribute("src")
+                            if qr_src:
+                                print(f"✅ 成功获取二维码 (长度: {len(qr_src)})")
+                                # 发送二维码给前端，使用 code 201 表示二维码数据
+                                # 注意：JSON 字符串中的双引号需要转义
+                                status_queue.put(f'{{"code": 201, "msg": "二维码获取成功", "data": "{qr_src}"}}')
+                            else:
+                                print("❌ 二维码元素没有src属性")
+                    except Exception as e:
+                        print(f"⚠️ 查找二维码超时: {str(e)}")
+            except Exception as e:
+                print(f"❌ 获取二维码逻辑异常: {str(e)}")
 
             # 等待登录完成（检测cookie是否包含登录信息或URL是否变化）
             login_wait_timeout = 300000  # 5分钟登录超时

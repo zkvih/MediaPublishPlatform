@@ -129,42 +129,15 @@ SAU 后端提供两种文件上传实现方式：
 
 ### API 接口文档
 
-#### 账号管理
+完整后端 API 文档请查看：[`sau_backend/API.md`](API.md)
 
-| 接口 | 方法 | 描述 | 参数 | 返回 |
-|------|------|------|------|------|
-| `/getAccounts` | GET | 获取所有账号信息 | 无 | 账号列表 |
-| `/getValidAccounts` | GET | 获取有效的账号信息 | 无 | 有效账号列表 |
-| `/account` | POST | 添加账号 | JSON 数据 | 操作结果 |
-| `/updateUserinfo` | POST | 更新账号信息 | JSON 数据 | 操作结果 |
-| `/deleteAccount` | GET | 删除账号 | `id`：账号 ID | 操作结果 |
-| `/downloadCookie` | GET | 下载 Cookie 文件 | `filePath`：文件路径 | Cookie 文件 |
-| `/uploadCookie` | POST | 上传 Cookie 文件 | 文件数据 | 操作结果 |
+该文档包含：
 
-#### 文件管理
-
-| 接口 | 方法 | 描述 | 参数 | 返回 |
-|------|------|------|------|------|
-| `/upload` | POST | 上传文件 | 文件数据 | 文件唯一 ID |
-| `/getFiles` | GET | 获取文件列表 | 无 | 文件列表 |
-
-#### 发布管理
-
-| 接口 | 方法 | 描述 | 参数 | 返回 |
-|------|------|------|------|------|
-| `/postVideo` | POST | 发布视频到单个平台 | JSON 数据 | 操作结果 |
-| `/postVideosToMultiplePlatforms` | POST | 发布视频到多个平台 | JSON 数据 | 操作结果 |
-| `/getPublishTaskRecords` | GET | 获取发布任务记录 | `page`：页码<br>`page_size`：每页记录数 | 任务记录列表 |
-| `/getPlatformStats` | GET | 获取平台统计数据 | 无 | 平台统计信息 |
-| `/cancelTask` | GET | 取消发布任务 | `id`：任务 ID | 操作结果 |
-| `/taskStatus` | GET | 获取发布任务状态 | `id`：任务 ID | 任务状态 |
-| `/platformConfig` | GET | 获取平台特定参数配置 | `type`：平台标识 | 平台配置 |
-
-#### 登录接口
-
-| 接口 | 方法 | 描述 | 参数 | 返回 |
-|------|------|------|------|------|
-| `/login` | GET | 登录接口（SSE 连接） | `id`：用户名<br>`type`：平台标识 | 登录二维码 |
+- 全量路由清单（基于 `sau_backend.py`）
+- 参数说明（Query / JSON / FormData）
+- 响应结构与示例
+- 错误码约定
+- 当前未实现接口清单（用于避免前后端接口不一致）
 
 ### 平台标识对照表
 

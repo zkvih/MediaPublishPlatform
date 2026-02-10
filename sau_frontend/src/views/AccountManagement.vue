@@ -781,6 +781,7 @@
         <div v-if="sseConnecting" class="qrcode-container">
           <div v-if="qrCodeData && !loginStatus" class="qrcode-wrapper">
             <p class="qrcode-tip">请使用对应平台APP扫描二维码登录</p>
+            <p class="qrcode-tip">请在30秒内完成扫码，剩余 {{ countdownSeconds }} 秒</p>
             <img :src="qrCodeData" alt="登录二维码" class="qrcode-image" />
           </div>
           <div v-else-if="!qrCodeData && !loginStatus" class="loading-wrapper">
@@ -1255,12 +1256,18 @@ const getDefaultAvatar = (name, platform) => {
 
 // SSE事件源对象
 let eventSource = null
+const countdownSeconds = ref(0)
+let countdownTimer = null
 
 // 关闭SSE连接
 const closeSSEConnection = () => {
   if (eventSource) {
     eventSource.close()
     eventSource = null
+  }
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
   }
 }
 
@@ -1273,6 +1280,7 @@ const connectSSE = (platform, name) => {
   sseConnecting.value = true
   qrCodeData.value = ''
   loginStatus.value = ''
+  countdownSeconds.value = 0
 
   // 获取平台类型编号
   const platformTypeMap = {
@@ -1341,6 +1349,11 @@ const connectSSE = (platform, name) => {
                 }, 1000)
               }, 1000)
             }
+          } else if (jsonData.code === 201) {
+            if (jsonData.data) {
+              qrCodeData.value = jsonData.data
+              startCountdown(30)
+            }
           } else if (jsonData.code === 500) {
             loginStatus.value = '500'
             // 登录失败，关闭连接
@@ -1351,6 +1364,7 @@ const connectSSE = (platform, name) => {
               sseConnecting.value = false
               qrCodeData.value = ''
               loginStatus.value = ''
+              countdownSeconds.value = 0
             }, 2000)
           }
     } catch (e) {
@@ -1366,6 +1380,7 @@ const connectSSE = (platform, name) => {
             qrCodeData.value = `data:image/png;base64,${data}`
           }
           console.log('设置二维码数据，长度:', data.length)
+          startCountdown(30)
         } catch (error) {
           console.error('处理二维码数据出错:', error)
         }
@@ -1380,6 +1395,24 @@ const connectSSE = (platform, name) => {
     closeSSEConnection()
     sseConnecting.value = false
   }
+
+}
+
+const startCountdown = (seconds) => {
+  countdownSeconds.value = seconds
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+  }
+  countdownTimer = setInterval(() => {
+    countdownSeconds.value -= 1
+    if (countdownSeconds.value <= 0) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+      ElMessage.warning('二维码已过期，请重试')
+      closeSSEConnection()
+      sseConnecting.value = false
+    }
+  }, 1000)
 }
 
 // 提交账号表单
