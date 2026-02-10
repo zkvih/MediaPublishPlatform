@@ -1,9 +1,12 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { getApiBaseUrl } from '@/utils/apiBase'
 
 // 创建axios实例
+const apiBaseUrl = getApiBaseUrl()
+
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409',
+  baseURL: apiBaseUrl,
   headers: {
     'Content-Type': 'application/json'
   }
