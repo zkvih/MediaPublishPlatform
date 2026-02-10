@@ -53,7 +53,7 @@ COPY --from=builder /app/dist/index.html /app
 COPY --from=builder /app/dist/assets /app/assets
 COPY --from=builder /app/dist/vite.svg /app/assets
 
-RUN cp conf.example.py conf.py
+RUN cp sau_backend/conf.example.py sau_backend/conf.py
 
 RUN mkdir -p /app/videoFile
 RUN mkdir -p /app/cookiesFile
