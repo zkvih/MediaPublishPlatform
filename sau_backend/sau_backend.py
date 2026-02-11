@@ -29,6 +29,9 @@ app = Flask(__name__)
 source_url_column_lock = threading.Lock()
 source_url_column_ready = False
 
+MULTI_IMAGE_SINGLE_POST_PLATFORMS = {"douyin", "kuaishou", "xiaohongshu"}
+IMAGE_FILE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
 # 允许所有来源跨域访问
 CORS(app)
 
@@ -68,6 +71,45 @@ def is_http_file_url(file_value):
 
     candidate = file_value.strip()
     return candidate.startswith("http://") or candidate.startswith("https://")
+
+
+def is_image_file_type(file_type):
+    try:
+        return int(file_type) == 1
+    except (TypeError, ValueError):
+        return False
+
+
+def should_single_post_multi_images(platform, file_type, file_list):
+    if platform not in MULTI_IMAGE_SINGLE_POST_PLATFORMS:
+        return False
+    if not is_image_file_type(file_type):
+        return False
+    if not isinstance(file_list, list) or len(file_list) <= 1:
+        return False
+
+    for file_item in file_list:
+        file_value = get_file_value_from_item(file_item)
+        _, extension = os.path.splitext(str(file_value))
+        if extension.lower() not in IMAGE_FILE_EXTENSIONS:
+            return False
+    return True
+
+
+def split_file_id_and_name(filename):
+    normalized_filename = os.path.basename(str(filename))
+    if "_" in normalized_filename:
+        parts = normalized_filename.split("_")
+        return parts[0], "_".join(parts[1:])
+    return None, normalized_filename
+
+
+def build_batch_record_filename(file_list):
+    file_names = []
+    for file_item in file_list:
+        _, real_name = split_file_id_and_name(file_item)
+        file_names.append(real_name)
+    return " | ".join(file_names)
 
 
 def get_file_value_from_item(file_item):
@@ -1318,6 +1360,15 @@ def postVideo():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
+            single_post_multi_images = should_single_post_multi_images(
+                platform, file_type, file_list
+            )
+            batch_record_filename = (
+                build_batch_record_filename(file_list)
+                if single_post_multi_images
+                else None
+            )
+
             # 遍历每个账号
             for account in account_list:
                 # 处理账号列表可能是字符串列表的情况
@@ -1340,6 +1391,27 @@ def postVideo():
                     account_file = account["filePath"]
                     account_name = account["userName"]
 
+                if single_post_multi_images:
+                    cursor.execute(
+                        """
+                        INSERT INTO publish_task_records (
+                            task_id, filename, file_id, account_id, account_name,
+                            platform_name, platform_type, status
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                        [
+                            task_id,
+                            batch_record_filename,
+                            None,
+                            account_file,
+                            account_name,
+                            platform,
+                            type,
+                            "发布中",
+                        ],
+                    )
+                    continue
+
                 # 遍历每个文件
                 for file_info in file_list:
                     # 处理文件列表可能是字符串列表的情况
@@ -1348,15 +1420,7 @@ def postVideo():
                     else:
                         filename = file_info["fileName"]
 
-                    # 解析文件名，提取文件ID和真正的文件名
-                    # 格式：file_id_filename.ext -> file_id: file_id, filename: filename.ext
-                    if "_" in filename:
-                        parts = filename.split("_")
-                        file_id = parts[0]
-                        real_filename = "_".join(parts[1:])
-                    else:
-                        file_id = None
-                        real_filename = filename
+                    file_id, real_filename = split_file_id_and_name(filename)
 
                     # 插入发布任务记录
                     cursor.execute(
@@ -1536,6 +1600,15 @@ def post_videos_to_multiple_platforms():
                     if platform_type is None:
                         continue
 
+                    single_post_multi_images = should_single_post_multi_images(
+                        platform_name, file_type, files
+                    )
+                    batch_record_filename = (
+                        build_batch_record_filename(files)
+                        if single_post_multi_images
+                        else None
+                    )
+
                     # 遍历每个账号文件
                     for account_file in account_files_list:
                         # 从数据库中查询账号名称
@@ -1548,17 +1621,30 @@ def post_videos_to_multiple_platforms():
                             result["userName"] if result else account_file.split(".")[0]
                         )
 
+                        if single_post_multi_images:
+                            cursor.execute(
+                                """
+                                INSERT INTO publish_task_records (
+                                    task_id, filename, file_id, account_id, account_name,
+                                    platform_name, platform_type, status
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                                [
+                                    task_id,
+                                    batch_record_filename,
+                                    None,
+                                    account_file,
+                                    account_name,
+                                    platform_name,
+                                    platform_type,
+                                    "待发布",
+                                ],
+                            )
+                            continue
+
                         # 遍历每个文件
                         for filename in files:
-                            # 解析文件名，提取文件ID和真正的文件名
-                            # 格式：file_id_filename.ext -> file_id: file_id, filename: filename.ext
-                            if "_" in filename:
-                                parts = filename.split("_")
-                                file_id = parts[0]
-                                real_filename = "_".join(parts[1:])
-                            else:
-                                file_id = None
-                                real_filename = filename
+                            file_id, real_filename = split_file_id_and_name(filename)
 
                             # 插入发布任务记录
                             cursor.execute(

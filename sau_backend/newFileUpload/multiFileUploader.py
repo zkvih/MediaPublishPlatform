@@ -1,10 +1,50 @@
 import asyncio
 from pathlib import Path
 from conf import BASE_DIR
-from .baseFileUploader import BaseFileUploader, run_upload
+from .baseFileUploader import run_upload
 from utils.files_times import generate_schedule_time_next_day
 
-def post_file(platform, account_file, file_type, files, title, text,tags,thumbnail_path, location, enableTimer=False, videos_per_day=1, daily_times=None, start_days=0):
+
+MULTI_IMAGE_SINGLE_POST_PLATFORMS = {"douyin", "kuaishou", "xiaohongshu"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def _is_image_file(file_path: Path) -> bool:
+    return file_path.suffix.lower() in IMAGE_EXTENSIONS
+
+
+def _is_image_file_type(file_type) -> bool:
+    try:
+        return int(file_type) == 1
+    except (TypeError, ValueError):
+        return False
+
+
+def _should_single_post_multi_images(platform, file_type, files) -> bool:
+    if not _is_image_file_type(file_type):
+        return False
+    if platform not in MULTI_IMAGE_SINGLE_POST_PLATFORMS:
+        return False
+    if len(files) <= 1:
+        return False
+    return all(_is_image_file(file_path) for file_path in files)
+
+
+def post_file(
+    platform,
+    account_file,
+    file_type,
+    files,
+    title,
+    text,
+    tags,
+    thumbnail_path,
+    location,
+    enableTimer=False,
+    videos_per_day=1,
+    daily_times=None,
+    start_days=0,
+):
     """
     批量发布多个文件到某个平台
     参数:
@@ -29,24 +69,79 @@ def post_file(platform, account_file, file_type, files, title, text,tags,thumbna
         files = [Path(BASE_DIR / "videoFile" / file) for file in files]
         file_num = len(files)
 
+        if _should_single_post_multi_images(platform, file_type, files):
+            if enableTimer:
+                publish_datetimes = generate_schedule_time_next_day(
+                    1,
+                    videos_per_day,
+                    daily_times,
+                    start_days=start_days,
+                )
+            else:
+                publish_datetimes = 0
+
+            for cookie in account_file:
+                try:
+                    publish_result = asyncio.run(
+                        run_upload(
+                            platform,
+                            cookie,
+                            file_type,
+                            files,
+                            title,
+                            text,
+                            tags,
+                            thumbnail_path,
+                            location,
+                            publish_datetimes,
+                        )
+                    )
+                    if publish_result:
+                        print(f"{platform}图文多图单作品发布成功，图片数量: {file_num}")
+                        return True
+
+                    print(f"{platform}图文多图单作品发布失败，尝试下一个账号")
+                except Exception as e:
+                    print(f"{platform}图文多图单作品发布失败: {str(e)}")
+                    continue
+
+            print(f"{platform}图文多图单作品所有账号发布失败")
+            return False
+
         if enableTimer:
-            publish_datetimes = generate_schedule_time_next_day(file_num, videos_per_day,daily_times, start_days)
+            publish_datetimes = generate_schedule_time_next_day(
+                file_num,
+                videos_per_day,
+                daily_times,
+                start_days=start_days,
+            )
         else:
             publish_datetimes = 0
 
         success_count = 0
         for index, file in enumerate(files):
-            file_published = False
             for cookie in account_file:
                 try:
                     # 使用独立的run_upload函数来执行上传
-                    publish_result = asyncio.run(run_upload(platform, cookie, file_type, file, title, text, tags, thumbnail_path, location, publish_datetimes))
-                     
+                    publish_result = asyncio.run(
+                        run_upload(
+                            platform,
+                            cookie,
+                            file_type,
+                            file,
+                            title,
+                            text,
+                            tags,
+                            thumbnail_path,
+                            location,
+                            publish_datetimes,
+                        )
+                    )
+
                     # 是否成功发布
                     if publish_result:
                         print(f"{platform}文件{file.name}发布成功")
                         success_count += 1
-                        file_published = True
                         # 这个账号发布成功后跳过
                         continue
                     else:
@@ -55,27 +150,39 @@ def post_file(platform, account_file, file_type, files, title, text,tags,thumbna
                     print(f"{platform}文件{file.name}发布失败: {str(e)}")
                     # 继续尝试其他账号，不中断当前文件的发布
                     continue
-            
+
             # 任务进度 - 显示成功数量/总数量
             print(f"{platform}已发布{success_count}/{file_num}个文件")
-        
+
         # 全部发布完毕后，显示最终结果
         if success_count == file_num:
             print(f"{platform}所有文件发布完成")
         else:
             print(f"{platform}发布完成，成功发布{success_count}/{file_num}个文件")
+
         # 如果有文件发布成功，返回True
-        if file_published:
-            return True
-        else:
-            return False
+        return success_count > 0
     except Exception as e:
         print(f"{platform}文件发布过程中发生异常: {str(e)}")
         return False
 
 
-#批量发布单个文件到多个平台
-def post_single_file_to_multiple_platforms(platforms, account_files, file_type, file, title, text, tags, thumbnail_path, location, enableTimer=False, videos_per_day=1, daily_times=None, start_days=0):
+# 批量发布单个文件到多个平台
+def post_single_file_to_multiple_platforms(
+    platforms,
+    account_files,
+    file_type,
+    file,
+    title,
+    text,
+    tags,
+    thumbnail_path,
+    location,
+    enableTimer=False,
+    videos_per_day=1,
+    daily_times=None,
+    start_days=0,
+):
     """
     批量发布单个文件到多个平台
     参数:
@@ -105,7 +212,12 @@ def post_single_file_to_multiple_platforms(platforms, account_files, file_type, 
         # 单个文件发布，不需要生成多个时间点
         if enableTimer:
             # 生成一个发布时间点
-            publish_datetimes = generate_schedule_time_next_day(1, videos_per_day, daily_times, start_days)
+            publish_datetimes = generate_schedule_time_next_day(
+                1,
+                videos_per_day,
+                daily_times,
+                start_days=start_days,
+            )
         else:
             publish_datetimes = 0
 
@@ -113,7 +225,10 @@ def post_single_file_to_multiple_platforms(platforms, account_files, file_type, 
             # 获取当前平台对应的账号文件列表
             if platform in account_files:
                 platform_accounts = account_files[platform]
-                platform_accounts = [Path(BASE_DIR / "cookiesFile" / account) for account in platform_accounts]
+                platform_accounts = [
+                    Path(BASE_DIR / "cookiesFile" / account)
+                    for account in platform_accounts
+                ]
             else:
                 print(f"平台{platform}没有对应的账号文件，跳过发布")
                 continue
@@ -121,8 +236,21 @@ def post_single_file_to_multiple_platforms(platforms, account_files, file_type, 
             for cookie in platform_accounts:
                 try:
                     # 使用独立的run_upload函数来执行上传
-                    publish_result = asyncio.run(run_upload(platform, cookie, file_type, file, title, text, tags, thumbnail_path, location, publish_datetimes))
-                    
+                    publish_result = asyncio.run(
+                        run_upload(
+                            platform,
+                            cookie,
+                            file_type,
+                            file,
+                            title,
+                            text,
+                            tags,
+                            thumbnail_path,
+                            location,
+                            publish_datetimes,
+                        )
+                    )
+
                     # 是否成功发布
                     if publish_result:
                         print(f"{platform}文件{file.name}发布成功")
@@ -135,23 +263,39 @@ def post_single_file_to_multiple_platforms(platforms, account_files, file_type, 
                     print(f"{platform}文件{file.name}发布失败: {str(e)}")
                     # 继续尝试其他账号，不中断当前平台的发布
                     continue
-            
+
             # 任务进度 - 显示成功数量/总数量
             print(f"已发布到{success_count}/{platform_num}个平台")
-        
+
         # 全部发布完毕后
         if success_count == platform_num:
             print(f"所有平台发布完成，成功发布到{success_count}/{platform_num}个平台")
             return True
         else:
-            print(f"发布完成，但部分平台发布失败，成功发布到{success_count}/{platform_num}个平台")
+            print(
+                f"发布完成，但部分平台发布失败，成功发布到{success_count}/{platform_num}个平台"
+            )
             return False
     except Exception as e:
         print(f"文件发布过程中发生异常: {str(e)}")
         return False
 
 
-def post_multiple_files_to_multiple_platforms(platforms, account_files, file_type, files, title, text, tags, thumbnail_path, location, enableTimer=False, videos_per_day=1, daily_times=None, start_days=0):
+def post_multiple_files_to_multiple_platforms(
+    platforms,
+    account_files,
+    file_type,
+    files,
+    title,
+    text,
+    tags,
+    thumbnail_path,
+    location,
+    enableTimer=False,
+    videos_per_day=1,
+    daily_times=None,
+    start_days=0,
+):
     """
     批量发布多个文件到多个平台
     参数:
@@ -177,39 +321,119 @@ def post_multiple_files_to_multiple_platforms(platforms, account_files, file_typ
         files = [Path(BASE_DIR / "videoFile" / file) for file in files]
         file_num = len(files)
         platform_num = len(platforms)
-        
+
         # 初始化发布结果字典
         publish_results = {}
         for platform in platforms:
             publish_results[platform] = {"success": 0, "total": file_num}
-        
+
         # 生成所有文件的发布时间点
         if enableTimer:
-            publish_datetimes = generate_schedule_time_next_day(file_num, videos_per_day, daily_times, start_days)
+            publish_datetimes = generate_schedule_time_next_day(
+                file_num,
+                videos_per_day,
+                daily_times,
+                start_days=start_days,
+            )
+            single_post_publish_datetime = generate_schedule_time_next_day(
+                1,
+                videos_per_day,
+                daily_times,
+                start_days=start_days,
+            )
         else:
             publish_datetimes = 0
-        
+            single_post_publish_datetime = 0
+
+        single_post_platforms = {
+            platform
+            for platform in platforms
+            if _should_single_post_multi_images(platform, file_type, files)
+        }
+
+        for platform in single_post_platforms:
+            if platform not in account_files:
+                print(f"平台{platform}没有对应的账号文件，跳过发布")
+                continue
+
+            platform_accounts = [
+                Path(BASE_DIR / "cookiesFile" / account)
+                for account in account_files[platform]
+            ]
+            published = False
+
+            for cookie in platform_accounts:
+                try:
+                    publish_result = asyncio.run(
+                        run_upload(
+                            platform,
+                            cookie,
+                            file_type,
+                            files,
+                            title,
+                            text,
+                            tags,
+                            thumbnail_path,
+                            location,
+                            single_post_publish_datetime,
+                        )
+                    )
+                    if publish_result:
+                        publish_results[platform]["success"] = file_num
+                        published = True
+                        print(
+                            f"{platform}图文多图单作品发布成功，覆盖 {file_num} 张图片"
+                        )
+                        break
+
+                    print(f"{platform}图文多图单作品发布失败，尝试下一个账号")
+                except Exception as e:
+                    print(f"{platform}图文多图单作品发布失败: {str(e)}")
+                    continue
+
+            if not published:
+                print(f"{platform}图文多图单作品所有账号发布失败")
+
         # 遍历所有文件
         for file_index, file in enumerate(files):
-            print(f"\n开始处理文件 {file.name} ({file_index+1}/{file_num})")
-            
+            print(f"\n开始处理文件 {file.name} ({file_index + 1}/{file_num})")
+
             # 遍历所有平台
             for platform in platforms:
+                if platform in single_post_platforms:
+                    continue
+
                 # 获取当前平台对应的账号文件列表
                 if platform in account_files:
                     platform_accounts = account_files[platform]
-                    platform_accounts = [Path(BASE_DIR / "cookiesFile" / account) for account in platform_accounts]
+                    platform_accounts = [
+                        Path(BASE_DIR / "cookiesFile" / account)
+                        for account in platform_accounts
+                    ]
                 else:
                     print(f"平台{platform}没有对应的账号文件，跳过发布")
                     continue
-                
+
                 # 遍历当前平台的所有账号，直到发布成功
                 published = False
                 for cookie in platform_accounts:
                     try:
                         # 使用独立的run_upload函数来执行上传
-                        publish_result = asyncio.run(run_upload(platform, cookie, file_type, file, title, text, tags, thumbnail_path, location, publish_datetimes))
-                        
+                        publish_result = asyncio.run(
+                            run_upload(
+                                platform,
+                                cookie,
+                                file_type,
+                                file,
+                                title,
+                                text,
+                                tags,
+                                thumbnail_path,
+                                location,
+                                publish_datetimes,
+                            )
+                        )
+
                         # 是否成功发布
                         if publish_result:
                             print(f"{platform}文件{file.name}发布成功")
@@ -222,17 +446,17 @@ def post_multiple_files_to_multiple_platforms(platforms, account_files, file_typ
                         print(f"{platform}文件{file.name}发布失败: {str(e)}")
                         # 继续尝试其他账号，不中断当前平台的发布
                         continue
-                
+
                 if not published:
                     print(f"{platform}文件{file.name}所有账号发布失败")
-        
+
         # 输出最终发布结果
         print("\n=== 发布结果汇总 ===")
         for platform, result in publish_results.items():
             success = result["success"]
             total = result["total"]
             print(f"{platform}: 成功 {success}/{total}")
-        
+
         return publish_results
     except Exception as e:
         print(f"文件发布过程中发生异常: {str(e)}")

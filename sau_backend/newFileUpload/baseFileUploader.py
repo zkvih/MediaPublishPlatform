@@ -6,6 +6,7 @@
 import os
 import asyncio
 from datetime import datetime
+from pathlib import Path
 from playwright.async_api import Playwright, async_playwright
 from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS, BASE_DIR
 from utils.base_social_media import set_init_script
@@ -29,6 +30,21 @@ class BaseFileUploader(object):
     publish_date: 发布时间，格式为YYYY-MM-DD HH:MM:SS
     """
 
+    IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+    VIDEO_SUFFIXES = {
+        ".mp4",
+        ".mov",
+        ".flv",
+        ".f4v",
+        ".mkv",
+        ".rm",
+        ".rmvb",
+        ".m4v",
+        ".mpg",
+        ".mpeg",
+        ".ts",
+    }
+
     def __init__(
         self,
         platform,
@@ -45,7 +61,7 @@ class BaseFileUploader(object):
         self.platform = platform
         self.account_file = account_file
         self.file_type = file_type
-        self.file_path = file_path
+        self.file_path = self._normalize_file_path(file_path)
         self.title = title
         self.text = text
         self.tags = tags
@@ -159,6 +175,11 @@ class BaseFileUploader(object):
             "--disable-blink-features=AutomationControlled",
         ]
 
+    def _normalize_file_path(self, file_path):
+        if isinstance(file_path, (list, tuple)):
+            return [Path(path_item) for path_item in file_path]
+        return Path(file_path)
+
     def _resolve_executable_path(self, executable_path):
         candidate = (executable_path or "").strip()
         if not candidate:
@@ -179,25 +200,33 @@ class BaseFileUploader(object):
         主入口函数
         """
         # 1.打印本次发布的文件信息
-        self.logger.info(f"{self.platform_name}将上传文件：{self.file_path}")
+        if isinstance(self.file_path, list):
+            self.logger.info(
+                f"{self.platform_name}将上传文件：{[str(path) for path in self.file_path]}"
+            )
+        else:
+            self.logger.info(f"{self.platform_name}将上传文件：{self.file_path}")
         # 根据文件名后缀判断文件类型
         # .jpg,.jpeg,.png,.webp 为图片文件
-        if self.file_path.suffix in [".jpg", ".jpeg", ".png", ".webp"]:
+        if isinstance(self.file_path, list):
+            if not self.file_path:
+                self.logger.error(f"{self.platform_name}上传文件列表为空")
+                return False
+
+            if all(
+                file_item.suffix.lower() in self.IMAGE_SUFFIXES
+                for file_item in self.file_path
+            ):
+                self.file_type = 1
+            else:
+                self.logger.error(
+                    f"{self.platform_name}图文多图发布仅支持图片文件：{[path.name for path in self.file_path]}"
+                )
+                return False
+        elif self.file_path.suffix.lower() in self.IMAGE_SUFFIXES:
             self.file_type = 1
         # .mp4,.mov,.flv,.f4v,.mkv,.rm,.rmvb,.m4v,.mpg,.mpeg,.ts 为视频文件
-        elif self.file_path.suffix in [
-            ".mp4",
-            ".mov",
-            ".flv",
-            ".f4v",
-            ".mkv",
-            ".rm",
-            ".rmvb",
-            ".m4v",
-            ".mpg",
-            ".mpeg",
-            ".ts",
-        ]:
+        elif self.file_path.suffix.lower() in self.VIDEO_SUFFIXES:
             self.file_type = 2
         else:
             self.logger.error(
@@ -446,8 +475,13 @@ class BaseFileUploader(object):
             async with page.expect_file_chooser() as fc_info:
                 await upload_button.click(force=True)
             file_chooser = await fc_info.value
-            await file_chooser.set_files(self.file_path)
-            self.logger.info(f"通过系统文件选择器上传文件: {self.file_path}")
+            upload_target = (
+                [str(path) for path in self.file_path]
+                if isinstance(self.file_path, list)
+                else str(self.file_path)
+            )
+            await file_chooser.set_files(upload_target)
+            self.logger.info(f"通过系统文件选择器上传文件: {upload_target}")
             return True
         except Exception as e:
             self.logger.error(f"选择图文/视频文件失败: {str(e)}")
@@ -509,8 +543,13 @@ class BaseFileUploader(object):
             # 使用find_button方法查找文件上传按钮
             file_input_button = await self.find_button(self.file_input_selector)
             if file_input_button:
-                await file_input_button.set_input_files(self.file_path)
-                self.logger.info(f"重新上传文件: {self.file_path}")
+                upload_target = (
+                    [str(path) for path in self.file_path]
+                    if isinstance(self.file_path, list)
+                    else str(self.file_path)
+                )
+                await file_input_button.set_input_files(upload_target)
+                self.logger.info(f"重新上传文件: {upload_target}")
                 return True
         except Exception as e:
             self.logger.error(f"重新上传失败: {str(e)}")

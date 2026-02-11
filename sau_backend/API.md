@@ -359,6 +359,7 @@ data: yyy
   - `title` `text` `tags` `category` `thumbnail` `location`
   - `enableTimer` `videosPerDay` `dailyTimes` `startDays`
 - 行为: 创建任务记录 -> 执行发布 -> 按结果回写状态
+  - 当 `fileType=1` 且平台为 `douyin`/`kuaishou`/`xiaohongshu` 且 `fileList` 有多张图片时：按单次请求多图合并为一条作品发布
 
 ### POST `/postVideosToMultiplePlatforms`
 
@@ -373,6 +374,7 @@ data: yyy
   - 自动过滤账号与平台类型不匹配的数据
   - 批量创建任务记录
   - 调用多平台批量发布并回写状态
+  - 当 `fileType=1` 且某平台为 `douyin`/`kuaishou`/`xiaohongshu` 且 `files` 有多张图片时：该平台按单次请求多图合并为一条作品发布
 
 ---
 
