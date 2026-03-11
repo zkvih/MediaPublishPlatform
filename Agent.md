@@ -38,22 +38,22 @@ The project also provides a command-line interface (CLI) for users who prefer to
 
 1.  **Install dependencies:**
     ```bash
-    pip install -r requirements.txt
+    uv sync
     ```
 
 2.  **Install Playwright browser drivers:**
     ```bash
-    playwright install chromium
+    uv run playwright install chromium
     ```
 
 3.  **Initialize the database:**
     ```bash
-    python db/createTable.py
+    uv run python db/createTable.py
     ```
 
 4.  **Run the backend server:**
     ```bash
-    python sau_backend.py
+    uv run python sau_backend/sau_backend.py
     ```
     The backend server will start on `http://localhost:5409`.
 
@@ -82,13 +82,13 @@ To use the CLI, you can run the `cli_main.py` script with the appropriate argume
 **Login:**
 
 ```bash
-python cli_main.py <platform> <account_name> login
+uv run python cli_main.py <platform> <account_name> login
 ```
 
 **Upload:**
 
 ```bash
-python cli_main.py <platform> <account_name> upload <video_file> [-pt {0,1}] [-t YYYY-MM-DD HH:MM]
+uv run python cli_main.py <platform> <account_name> upload <video_file> [-pt {0,1}] [-t YYYY-MM-DD HH:MM]
 ```
 
 ## Development Conventions
@@ -97,5 +97,5 @@ python cli_main.py <platform> <account_name> upload <video_file> [-pt {0,1}] [-t
 *   The frontend code is located in the `sau_frontend` directory.
 *   The project uses a SQLite database for data storage. The database file is located at `db/database.db`.
 *   The `conf.example.py` file should be copied to `conf.py` and configured with the appropriate settings.
-*   The `requirements.txt` file lists the Python dependencies.
+*   The `pyproject.toml` and `uv.lock` files define the Python dependencies.
 *   The `package.json` file in the `sau_frontend` directory lists the frontend dependencies.

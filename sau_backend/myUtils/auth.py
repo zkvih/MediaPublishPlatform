@@ -3,7 +3,7 @@ import configparser
 import os
 
 from playwright.async_api import async_playwright
-from conf import BASE_DIR
+from conf import BASE_DIR, LOCAL_CHROME_PATH
 from utils.base_social_media import set_init_script
 from utils.log import create_logger
 from pathlib import Path
@@ -51,7 +51,10 @@ async def check_cookie_generic(type, file_path):
     # 使用Playwright检测账号有效性
     try:
         async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=True)
+            launch_options = {"headless": True}
+            if LOCAL_CHROME_PATH:
+                launch_options["executable_path"] = LOCAL_CHROME_PATH
+            browser = await playwright.chromium.launch(**launch_options)
             context = await browser.new_context(storage_state=Path(BASE_DIR / "cookiesFile" / file_path))
             context = await set_init_script(context)
 

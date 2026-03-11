@@ -1,30 +1,11 @@
-FROM node:22.21.1 AS builder
-
-WORKDIR /app
-
-RUN npm config set registry https://registry.npmmirror.com
-
-COPY sau_frontend .
-
-RUN npm install
-
-ENV NODE_ENV=production
-ENV PATH=/app/node_modules/.bin:$PATH
-
-#   替换前端中的地址
-RUN sed -i 's#\${baseUrl}##g' /app/src/views/AccountManagement.vue
-RUN sed -i "s#\${import\.meta\.env\.VITE_API_BASE_URL || 'http:\/\/localhost:5409'}##g" /app/src/api/material.js
-RUN sed -i 's#localhost:5409##g' /app/.env.production
-
-RUN npm run build
-
-
 FROM python:3.10.19
+COPY --from=ghcr.io/astral-sh/uv:0.10.9 /uv /uvx /bin/
 
 WORKDIR /app
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-ENV LOCAL_CHROME_PATH=
+ENV UV_LINK_MODE=copy
+ENV UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
 RUN apt-get update && apt-get install -y --no-install-recommends libnss3 \
     libnspr4 \
@@ -40,26 +21,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends libnss3 \
     libxkbcommon0 \
     libasound2 && rm -rf /var/lib/apt/lists/*
 
-RUN pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+COPY pyproject.toml .python-version ./
 
-COPY requirements.txt requirements.txt
+RUN uv sync --no-dev --no-install-project
 
-RUN pip install -r requirements.txt
-
-# 安装完整版 Chromium（支持无头模式截图）
-RUN playwright install chromium
+RUN uv run playwright install chromium-headless-shell
 
 COPY . .
 
-COPY --from=builder /app/dist/index.html /app/sau_backend/
-COPY --from=builder /app/dist/assets /app/sau_backend/assets
-COPY --from=builder /app/dist/vite.svg /app/sau_backend/assets
-
-RUN cp sau_backend/conf.example.py sau_backend/conf.py
-
 RUN mkdir -p /app/videoFile
 RUN mkdir -p /app/cookiesFile
+RUN mkdir -p /app/db
 
 EXPOSE 5409
 
-CMD ["python", "sau_backend/sau_backend.py"]
+CMD ["/app/.venv/bin/python", "sau_backend/sau_backend.py"]

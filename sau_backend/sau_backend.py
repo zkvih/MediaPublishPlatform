@@ -28,6 +28,7 @@ active_queues = {}
 app = Flask(__name__)
 source_url_column_lock = threading.Lock()
 source_url_column_ready = False
+DB_PATH = Path(BASE_DIR / "db" / "database.db")
 
 MULTI_IMAGE_SINGLE_POST_PLATFORMS = {"douyin", "kuaishou", "xiaohongshu"}
 IMAGE_FILE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -38,31 +39,55 @@ CORS(app)
 # 限制上传文件大小为160MB
 app.config["MAX_CONTENT_LENGTH"] = 160 * 1024 * 1024
 
-# 获取当前目录（假设 index.html 和 assets 在这里）
-current_dir = os.path.dirname(os.path.abspath(__file__))
+def init_database():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS user_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type INTEGER NOT NULL,
+                filePath TEXT NOT NULL,
+                userName TEXT NOT NULL,
+                status INTEGER DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS file_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                filesize REAL,
+                upload_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                file_path TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS publish_task_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                file_id INTEGER,
+                account_id INTEGER NOT NULL,
+                account_name TEXT NOT NULL,
+                platform_name TEXT NOT NULL,
+                platform_type INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT '待发布',
+                create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                error_msg TEXT
+            );
+            """
+        )
+        cursor.execute("PRAGMA table_info(file_records)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "source_url" not in columns:
+            cursor.execute("ALTER TABLE file_records ADD COLUMN source_url TEXT")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_file_records_source_url ON file_records(source_url)"
+        )
+        conn.commit()
 
 
-# 处理所有静态资源请求（未来打包用）
-@app.route("/assets/<filename>")
-def custom_static(filename):
-    return send_from_directory(os.path.join(current_dir, "assets"), filename)
-
-
-# 处理 favicon.ico 静态资源（未来打包用）
-@app.route("/favicon.ico")
-def favicon():
-    return send_from_directory(os.path.join(current_dir, "assets"), "vite.svg")
-
-
-@app.route("/vite.svg")
-def vite_svg():
-    return send_from_directory(os.path.join(current_dir, "assets"), "vite.svg")
-
-
-# （未来打包用）
-@app.route("/")
-def index():  # put application's code here
-    return send_from_directory(current_dir, "index.html")
+init_database()
 
 
 def is_http_file_url(file_value):
@@ -132,7 +157,7 @@ def download_http_file_to_material(file_url):
     if not normalized_url:
         raise ValueError("文件URL不能为空")
 
-    with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -175,7 +200,7 @@ def download_http_file_to_material(file_url):
         raise ValueError(f"下载远程文件失败: {normalized_url}, 错误: {str(e)}")
 
     file_size_mb = round(float(os.path.getsize(file_path)) / (1024 * 1024), 2)
-    with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -222,7 +247,7 @@ def ensure_file_records_source_url_column():
         if source_url_column_ready:
             return
 
-        with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+        with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute("PRAGMA table_info(file_records)")
             columns = {row[1] for row in cursor.fetchall()}
@@ -380,7 +405,8 @@ def get_all_files():
 
             return jsonify({"code": 200, "msg": "success", "data": data}), 200
     except Exception as e:
-        return jsonify({"code": 500, "msg": str("get file failed!"), "data": None}), 500
+        print(f"getFiles failed: {e}")
+        return jsonify({"code": 500, "msg": f"get file failed: {e}", "data": None}), 500
 
 
 @app.route("/deleteFile", methods=["GET"])

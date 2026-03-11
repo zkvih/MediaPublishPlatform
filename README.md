@@ -143,31 +143,38 @@ cd SAU
 2. **安装 Python 依赖**
 
 ```bash
-# 创建虚拟环境（推荐）
-python -m venv venv
+# 安装 uv（如本机尚未安装）
+# Windows: winget install --id=astral-sh.uv -e
+# macOS / Linux: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 激活虚拟环境
-# Windows
-venv\Scripts\activate
-# Linux/MacOS
-source venv/bin/activate
+# 可选：安装并固定 Python 3.10
+uv python install 3.10
 
-# 安装依赖
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 安装项目依赖（默认会创建 .venv）
+uv sync
+
+# 如需使用清华镜像
+# UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple uv sync
 ```
 
 3. **安装 Playwright 浏览器驱动**
 
 ```bash
-playwright install chromium
+# 如果本机已经配置好 Chrome / Chromium，可跳过此步骤
+uv run playwright install chromium
 ```
 
 4. **初始化数据库**
 
 ```bash
 # 运行数据库初始化脚本
-python db/createTable.py
+uv run python db/createTable.py
 ```
+
+说明：
+
+- 数据库文件固定创建在 `db/database.db`
+- 后端启动时会自动补齐缺失的数据表和字段
 
 5. **配置 Chrome 浏览器路径**
 
@@ -187,8 +194,7 @@ LOCAL_CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrom
 6. **启动后端服务**
 
 ```bash
-cd sau_backend
-python sau_backend.py
+uv run python sau_backend/sau_backend.py
 ```
 
 后端服务将在 `http://localhost:5409` 启动。
@@ -196,12 +202,13 @@ python sau_backend.py
 7. **安装前端依赖并启动**
 
 ```bash
-cd ../sau_frontend
+cd sau_frontend
 npm install
 npm run dev
 ```
 
 前端项目将在 `http://localhost:5173` 启动，在浏览器中打开此链接即可访问。
+开发环境下，前端默认通过 Vite 代理将 `/api/*` 转发到 `http://localhost:5409`。
 
 #### Windows 快速启动（非首次启动）
 
@@ -212,6 +219,14 @@ start-win.bat
 ```
 
 此脚本将自动激活虚拟环境（如果存在）并启动后端服务。
+
+#### 开发环境启动方式说明
+
+项目当前采用前后端分离开发模式：
+
+1. 前端开发服务运行在 `http://localhost:5173`
+2. 后端 API 服务运行在 `http://localhost:5409`
+3. 前端通过 `/api` 代理访问后端接口
 
 ## 项目架构
 
@@ -300,7 +315,11 @@ start-win.bat
 sau/
 ├── README.md              # 项目说明文档
 ├── start-win.bat          # Windows 启动脚本
-├── requirements.txt       # Python 依赖包
+├── pyproject.toml         # Python / uv 依赖定义
+├── uv.lock                # uv 锁文件
+├── .python-version        # Python 版本约束
+├── Dockerfile             # 后端 Dockerfile
+├── docker-compose.yml     # 前后端分离 Docker 编排
 ├── sau_backend/           # 后端项目
 │   ├── README.md          # 后端说明文档
 │   ├── conf.py            # 配置文件
@@ -333,6 +352,8 @@ sau/
 │   │   └── main.js        # 入口文件
 │   ├── public/            # 静态资源
 │   ├── package.json       # npm 配置
+│   ├── Dockerfile         # 前端 Dockerfile
+│   ├── nginx.conf         # 前端 Nginx 配置
 │   └── vite.config.js     # Vite 配置
 ├── db/                    # 数据库相关
 │   ├── database.db        # SQLite 数据库文件
@@ -445,6 +466,47 @@ sau/
 
 ### Docker 部署
 
+项目已提供两种 Docker 部署方式：
+
+1. **前后端分离 Docker Compose（当前默认）**
+2. **基于 OpenResty 的统一入口部署**
+
+#### 方案一：前后端分离 Docker Compose（默认）
+
+1. 构建并启动服务（前端、后端）：
+
+```bash
+docker compose up -d --build
+```
+
+2. 查看服务状态：
+
+```bash
+docker compose ps
+```
+
+3. 访问应用：
+
+打开浏览器，访问：
+
+- 前端：`http://localhost:8080`
+- 后端：`http://localhost:5409`
+
+4. 停止服务：
+
+```bash
+docker compose down
+```
+
+说明：
+
+- 根目录 `Dockerfile` 用于构建后端服务
+- `sau_frontend/Dockerfile` 用于构建前端静态站点
+- `docker-compose.yml` 采用前后端分离部署方式
+- 前端容器通过 Nginx 将 `/api` 反代到 `backend:5409`
+
+#### 方案二：OpenResty 统一入口部署
+
 项目已提供基于 OpenResty 的反向代理编排文件：`docker-compose.openresty.yml`。
 
 1. 构建并启动服务（前端、后端、OpenResty）：
@@ -495,6 +557,7 @@ npm run build
 - 修改 `sau_backend/conf.py` 中的配置
 - 配置反向代理（如 Nginx）
 - 设置环境变量
+- 生产环境建议保持前后端分离部署，前端静态资源与后端 API 分开运行
 
 3. 启动服务：
 
@@ -602,7 +665,26 @@ server {
 4. 确认平台是否有发布限制
 5. 尝试重新发布
 
-### 3. 如何添加新平台支持？
+### 3. `/getFiles` 返回 500 怎么办？
+
+通常是数据库文件路径不一致，或者旧数据库缺少新字段导致。
+
+当前项目已统一为：
+
+1. 数据库文件路径固定为 `db/database.db`
+2. 后端启动时会自动补齐缺失表和 `source_url` 字段
+3. 初始化脚本 `db/createTable.py` 兼容旧库升级
+
+如果你之前运行过旧版本脚本，建议执行：
+
+```bash
+rm -f db/database.db
+uv run python db/createTable.py
+```
+
+然后重启后端服务。
+
+### 4. 如何添加新平台支持？
 
 MPP 系统采用模块化设计，新增平台支持非常简单，只需修改 `sau_backend/newFileUpload/platform_configs.py` 文件即可：
 
@@ -644,7 +726,7 @@ MPP 系统采用模块化设计，新增平台支持非常简单，只需修改 
 }
 ```
 
-### 4. 系统运行缓慢怎么办？
+### 5. 系统运行缓慢怎么办？
 
 系统运行缓慢可能是由于：
 

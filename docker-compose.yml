@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mpp-backend
+    ports:
+      - "5409:5409"
+    volumes:
+      - ./db:/app/db
+      - ./videoFile:/app/videoFile
+      - ./cookiesFile:/app/cookiesFile
+      - ./logs:/app/logs
+
+  frontend:
+    build:
+      context: ./sau_frontend
+      dockerfile: Dockerfile
+    container_name: mpp-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
